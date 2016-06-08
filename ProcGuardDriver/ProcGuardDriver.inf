@@ -1,0 +1,32 @@
+;
+; ProcGuardDriver.inf
+;
+
+[Version]
+Signature="$WINDOWS NT$"
+Class=Process
+ClassGuid={4d36e97e-e325-11ce-bfc1-08002be44444}
+Provider=xfs
+DriverVer=
+CatalogFile=ProcGuardDriver.cat
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+
+
+[Manufacturer]
+%ManufacturerName%=Standard,NT$ARCH$
+
+[Standard.NT$ARCH$]
+
+
+[Strings]
+ManufacturerName=""
+ClassName=""
+DiskName="ProcGuardDriver Source Disk"
