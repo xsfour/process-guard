@@ -19,6 +19,13 @@ writeBuffer(
 	SIZE_T Bytes
 	);
 
+static PVOID
+readBuffer(
+	PVOID Buffer,
+	PVOID Dst,
+	SIZE_T Bytes
+	);
+
 NTSTATUS
 DriverEntry(
 	_In_ PDRIVER_OBJECT DriverObject,
@@ -80,6 +87,7 @@ DriverEntry(
 	DriverObject->MajorFunction[IRP_MJ_CREATE] = MyCreateDispatch;
 	DriverObject->MajorFunction[IRP_MJ_CLOSE] = MyCloseDispatch;
 	DriverObject->MajorFunction[IRP_MJ_READ] = MyReadDispatch;
+	DriverObject->MajorFunction[IRP_MJ_WRITE] = MyWriteDispatch;
 
 	init();
 
@@ -196,6 +204,44 @@ MyReadDispatch(
 }
 
 NTSTATUS
+MyWriteDispatch(
+	_In_ PDEVICE_OBJECT DeviceObject,
+	_In_ PIRP Irp
+	)
+{
+	PIO_STACK_LOCATION irpsp;
+	NTSTATUS status = STATUS_SUCCESS;
+	ULONG information = 0;
+	PVOID buffer = NULL;
+	ULONG bufferLen;
+
+	PWCHAR name;
+
+	UNREFERENCED_PARAMETER(DeviceObject);
+
+	irpsp = IoGetCurrentIrpStackLocation(Irp);
+	bufferLen = irpsp->Parameters.Write.Length;
+
+	buffer = MmGetSystemAddressForMdlSafe(Irp->MdlAddress, LowPagePriority);
+	if (buffer == NULL) {
+		status = STATUS_UNSUCCESSFUL;
+		Irp->IoStatus.Status = status;
+		Irp->IoStatus.Information = bufferLen;
+		IoCompleteRequest(Irp, IO_NO_INCREMENT);
+		return status;
+	}
+
+	buffer = readBuffer(buffer, &name, bufferLen);
+	information = bufferLen;
+
+	Irp->IoStatus.Status = status;
+	Irp->IoStatus.Information = information;
+	IoCompleteRequest(Irp, IO_NO_INCREMENT);
+
+	return Irp->IoStatus.Status;
+}
+
+NTSTATUS
 MyNullDispatch(
 	_In_ PDEVICE_OBJECT DeviceObject,
 	_In_ PIRP Irp
@@ -218,6 +264,18 @@ writeBuffer(
 	)
 {
 	RtlCopyMemory(Buffer, Src, Bytes);
+
+	return (PUCHAR)Buffer + Bytes;
+}
+
+PVOID
+readBuffer(
+	PVOID Buffer,
+	PVOID Dst,
+	SIZE_T Bytes
+	)
+{
+	RtlCopyMemory(Dst, Buffer, Bytes);
 
 	return (PUCHAR)Buffer + Bytes;
 }

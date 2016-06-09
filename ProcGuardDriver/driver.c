@@ -93,6 +93,7 @@ DriverEntry(
 	DriverObject->MajorFunction[IRP_MJ_CREATE] = MyCreateDispatch;
 	DriverObject->MajorFunction[IRP_MJ_CLOSE] = MyCloseDispatch;
 	DriverObject->MajorFunction[IRP_MJ_READ] = MyReadDispatch;
+	DriverObject->MajorFunction[IRP_MJ_WRITE] = MyWriteDispatch;
 
 	//setProcessIdOffset(getProcessIdOffset());
 
@@ -249,7 +250,7 @@ MyWriteDispatch(
 	UNREFERENCED_PARAMETER(DeviceObject);
 
 	irpsp = IoGetCurrentIrpStackLocation(Irp);
-	bufferLen = irpsp->Parameters.Read.Length;
+	bufferLen = irpsp->Parameters.Write.Length;
 
 	buffer = MmGetSystemAddressForMdlSafe(Irp->MdlAddress, LowPagePriority);
 	if (buffer == NULL) {
@@ -324,8 +325,7 @@ writeBuffer(
 	return (PUCHAR)Buffer + Bytes;
 }
 
-
-static PVOID
+PVOID
 readBuffer(
 	PVOID Buffer,
 	PVOID Dst,

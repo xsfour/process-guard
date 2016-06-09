@@ -41,6 +41,12 @@ MyReadDispatch(
 	);
 
 NTSTATUS
+MyWriteDispatch(
+	_In_ PDEVICE_OBJECT DeviceObject,
+	_In_ PIRP Irp
+	);
+
+NTSTATUS
 MyNullDispatch(
 	_In_ PDEVICE_OBJECT DeviceObject,
 	_In_ PIRP Irp

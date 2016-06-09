@@ -16,6 +16,9 @@
 
 #define EP_OFFSET_THREAD_LIST (0x188)
 
+// HANDLE_TABLE
+#define HT_OFFSET_LIST (0x010)
+
 #else
 
 #define EP_OFFSET_PID (0x0b4)
