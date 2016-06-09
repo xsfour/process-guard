@@ -3,11 +3,39 @@
 
 #define SEC_IMAGE 0x1000000
 
-static CREATE_SECTION_FUNC OldNtCreateSection = NULL;
+static WP_GLOBALS WpGlobals;
+
+static CREATE_SECTION_FUNC OldZwCreateSection = NULL;
 
 static DWORD
 getSSDTIndex(PBYTE ApiCall);
 
+
+static CREATE_SECTION_FUNC
+hookSSDT(
+	PBYTE ApiCall,
+	PBYTE NewCall,
+	PDWORD CallTable
+	);
+
+static VOID
+unhookSSDT(
+	PBYTE ApiCall,
+	PBYTE OldCall,
+	PDWORD CallTable
+	);
+
+static WP_GLOBALS
+disableWP_MDL(
+	PDWORD Ssdt,
+	DWORD NServices
+	);
+
+static VOID
+enableWP_MDL(
+	PMDL Mdl,
+	PVOID CallTable
+	);
 
 //-----------------------------------------------------
 // FUNCTION DEFINITIONS
@@ -28,6 +56,10 @@ NTSTATUS MyCreateSection(
 	PMY_MSG_LIST_ENTRY msg = NULL;
 	PFILE_OBJECT FileObject;
 	BOOLEAN confirmed;
+	LARGE_INTEGER timeOut =
+		RtlConvertLongToLargeInteger(0);
+
+	UNREFERENCED_PARAMETER(timeOut);
 
 	// 对有可执行权限的加载进行拦截
 	if ((AllocationAttributes == SEC_IMAGE) &&
@@ -47,37 +79,41 @@ NTSTATUS MyCreateSection(
 				status = IoQueryFileDosDeviceName(FileObject, &FilePath);
 				ObDereferenceObject(FileObject);
 				if (NT_SUCCESS(status)) {
-					KdPrint(("FilePath: %ws\r\n", FilePath->Name.Buffer));
+					KdPrint((DBG_PREFIX "FilePath: %wZ\r\n", FilePath->Name));
 					
 					// 为该事件添加一条消息
-					msg = ExAllocatePoolWithTag(
-						NonPagedPool, sizeof(MY_MSG_LIST_ENTRY), ALLOC_TAG);
-					if (msg == NULL) {
-						status = STATUS_INSUFFICIENT_RESOURCES;
+					status = initMsgListEntry(msg, &FilePath->Name);
+					if (!NT_SUCCESS(status)) {
 						ExFreePool(FilePath);
-						goto ret;
+						return status;
 					}
-					status = addMsgListEntry(msg, &FilePath->Name);
+
+					KdPrint((DBG_PREFIX "msg->Filename: %wZ\r\n", msg->Filename));
 
 					// 激活“新消息”事件，驱动将消息传给用户
 					KeSetEvent(getNewMsgEvent(), 0, TRUE);
 
 					// 等待，直到消息被用户确认
+					/*
 					KeWaitForSingleObject(
 						&msg->Event,
 						Executive,
 						KernelMode,
-						0, NULL);
+						0, &timeOut);
+						*/
+					//KdPrint((DBG_PREFIX "createSection waiting: %wZ\r\n", msg->Filename));
+					//while (MSG_PENDING(msg)) {
+						; // waiting
+					//}
+					//KdPrint((DBG_PREFIX "createSection responsed: %wZ\r\n", msg->Filename));
+						confirmed = TRUE;// MSG_CONFIRMED(msg);
 
-					confirmed = MSG_CONFIRMED(msg);
-
-					ExFreePool(msg);
+					freeMsgListEntry(msg);
 					ExFreePool(FilePath);
 
 					// 用户拒绝
 					if (!confirmed) {
-						status = STATUS_ACCESS_DENIED;
-						goto ret;
+						return STATUS_ACCESS_DENIED;
 					}
 
 					KdPrint((DBG_PREFIX "confirmed\r\n"));
@@ -86,7 +122,7 @@ NTSTATUS MyCreateSection(
 		}
 	}
 
-	status = OldNtCreateSection(SectionHandle,
+	status = OldZwCreateSection(SectionHandle,
 		DesiredAccess,
 		ObjectAttributes,
 		MaximumSize,
@@ -94,14 +130,64 @@ NTSTATUS MyCreateSection(
 		AllocationAttributes,
 		FileHandle);
 
-ret:
 	return status;
 }
 
+#pragma warning(push)
+#pragma warning(disable:4054)
+NTSTATUS
+hook()
+{
+#if DBG
+	// my_ssdt::hook()
+	__debugbreak();
+#endif
+
+	WpGlobals = disableWP_MDL(
+		KeServiceDescriptorTable.KiServiceTable,
+		KeServiceDescriptorTable.NSystemCalls
+		);
+
+	if (WpGlobals.Mdl == NULL || WpGlobals.CallTable == NULL) {
+		return STATUS_UNSUCCESSFUL;
+	}
+
+	OldZwCreateSection = hookSSDT(
+		(PVOID)ZwCreateSection,
+		(PVOID)MyCreateSection,
+		WpGlobals.CallTable
+		);
+
+	enableWP_MDL(WpGlobals.Mdl, WpGlobals.CallTable);
+
+	return STATUS_SUCCESS;
+}
+
+VOID
+unhook()
+{
+	WpGlobals = disableWP_MDL(
+		KeServiceDescriptorTable.KiServiceTable,
+		KeServiceDescriptorTable.NSystemCalls
+		);
+
+	unhookSSDT(
+		(PVOID)ZwCreateSection,
+		(PVOID)OldZwCreateSection,
+		WpGlobals.CallTable
+		);
+
+	enableWP_MDL(WpGlobals.Mdl, WpGlobals.CallTable);
+
+	KdPrint((DBG_PREFIX "[my_ssdt::unhook]Free message list...\r\n"));
+	freeAllMsgs();
+}
+#pragma warning(pop)
+
 WP_GLOBALS
 disableWP_MDL(
-	PDWORD Ssdt,
-	DWORD NServices
+	_In_ PDWORD Ssdt,
+	_In_ DWORD	NServices
 	)
 {
 	WP_GLOBALS wpGlobals;
@@ -137,8 +223,8 @@ disableWP_MDL(
 
 VOID
 enableWP_MDL(
-	PMDL Mdl,
-	PBYTE CallTable
+	_In_ PMDL	Mdl,
+	_In_ PVOID	CallTable
 	)
 {
 	if (Mdl != NULL) {
@@ -147,11 +233,11 @@ enableWP_MDL(
 	}
 }
 
-PBYTE
+CREATE_SECTION_FUNC
 hookSSDT(
-	PBYTE ApiCall,
-	PBYTE NewCall,
-	PDWORD CallTable
+	_In_ PBYTE	ApiCall,
+	_In_ PBYTE	NewCall,
+	_In_ PDWORD CallTable
 	)
 {
 	PLONG target;
@@ -160,14 +246,14 @@ hookSSDT(
 	indexValue = getSSDTIndex(ApiCall);
 	target = (PLONG)&(CallTable[indexValue]);
 
-	return ((PBYTE)InterlockedExchange(target, (LONG)NewCall));
+	return (CREATE_SECTION_FUNC)(InterlockedExchange(target, (LONG)NewCall));
 }
 
 VOID
 unhookSSDT(
-	PBYTE ApiCall,
-	PBYTE OldCall,
-	PDWORD CallTable
+	_In_ PBYTE	ApiCall,
+	_In_ PBYTE	OldCall,
+	_In_ PDWORD CallTable
 	)
 {
 	hookSSDT(ApiCall, OldCall, CallTable);
@@ -175,7 +261,7 @@ unhookSSDT(
 
 DWORD
 getSSDTIndex(
-	PBYTE ApiCall
+	_In_ PBYTE ApiCall
 	)
 {
 	return *((PULONG)(ApiCall + 1));

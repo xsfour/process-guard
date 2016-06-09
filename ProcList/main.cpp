@@ -4,12 +4,14 @@
 #include "KernelModeQuery.h"
 #include "UserModeQuery.h"
 #include "ProcessInfo.h"
+#include "ProcGuard.h"
 
 int main(void)
 {
 	KernelModeQuery kernel = KernelModeQuery::getInstance();
 	UserModeQuery user = UserModeQuery::getInstance();
 
+	/*
 	Processes procs = user.getProcesses();
 	kernel.reloadProcesses();
 	kernel.mergeProcesses(procs);
@@ -31,6 +33,10 @@ int main(void)
 
 		++it;
 	}
+	*/
+
+	ProcGuard guard = ProcGuard::getInstance();
+	guard.listen();
 
 	system("pause");
 	return 0;

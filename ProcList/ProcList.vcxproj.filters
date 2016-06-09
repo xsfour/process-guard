@@ -27,12 +27,18 @@
     <ClInclude Include="UserModeQuery.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="ProcGuard.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="KernelModeQuery.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="ProcGuard.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

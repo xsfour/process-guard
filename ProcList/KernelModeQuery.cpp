@@ -5,8 +5,6 @@
 #include <stdio.h>
 #include <algorithm>
 
-const WCHAR *DEVICE_SYMB_LINK = L"\\\\.\\ProcScannerCDOSL";
-
 BOOLEAN KernelModeQuery::reloadProcesses()
 {
 	processes.clear();

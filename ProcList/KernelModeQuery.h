@@ -30,6 +30,8 @@ private:
 	Processes processes;
 
 	std::wstring errorMsg;
+
+	const WCHAR *DEVICE_SYMB_LINK = L"\\\\.\\ProcScannerCDOSL";
 };
 
 KernelModeQuery& KernelModeQuery::getInstance()

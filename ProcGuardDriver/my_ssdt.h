@@ -15,37 +15,16 @@ typedef struct ServiceDescriptorEntry {
 
 __declspec(dllimport) SDE KeServiceDescriptorTable;
 
-
 typedef struct _WP_GLOBALS {
-	PUCHAR CallTable;
+	PVOID CallTable;
 	PMDL Mdl;
 } WP_GLOBALS, *PWP_GLOBALS;
 
-WP_GLOBALS
-disableWP_MDL(
-	PDWORD Ssdt,
-	DWORD NServices
-	);
+NTSTATUS
+hook();
 
 VOID
-enableWP_MDL(
-	PMDL Mdl,
-	PBYTE CallTable
-	);
-
-PBYTE
-hookSSDT(
-	PBYTE ApiCall,
-	PBYTE NewCall,
-	PDWORD CallTable
-	);
-
-VOID
-unhookSSDT(
-	PBYTE ApiCall,
-	PBYTE OldCall,
-	PDWORD CallTable
-	);
+unhook();
 
 typedef NTSTATUS(*CREATE_SECTION_FUNC)(
 	_Out_    PHANDLE            SectionHandle,

@@ -150,10 +150,12 @@
   <ItemGroup>
     <ClCompile Include="KernelModeQuery.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="ProcGuard.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="KernelModeQuery.h" />
     <ClInclude Include="ProcessInfo.h" />
+    <ClInclude Include="ProcGuard.h" />
     <ClInclude Include="UserModeQuery.cpp" />
     <ClInclude Include="UserModeQuery.h" />
   </ItemGroup>

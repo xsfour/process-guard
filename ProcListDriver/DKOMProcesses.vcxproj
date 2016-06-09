@@ -158,6 +158,7 @@
   <ItemGroup>
     <ClInclude Include="driver.h" />
     <ClInclude Include="mydef.h" />
+    <ClInclude Include="offsets.h" />
     <ClInclude Include="process.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

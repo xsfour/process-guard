@@ -1,15 +1,18 @@
 #include "message.h"
 
+#include "offsets.h"
+
 static ULONG ProcessIdOffset = 0;
 
 static MY_MSG_LIST_ENTRY _MsgHead;
+static MY_MSG_LIST_ENTRY _WaitingMsgHead;
 
 static KSPIN_LOCK _SpinLock;
+static KSPIN_LOCK _WSpinLock;
+
+static BOOLEAN Forbidden = FALSE;
 
 KEVENT _NewMsgEvent;
-
-#define GET_PID_FROM_EPROCESS(_Eprocess) \
-	(*(PULONG)((PBYTE)(_Eprocess) + (ProcessIdOffset)))
 
 CFORCEINLINE
 static VOID
@@ -20,11 +23,12 @@ initMsgHead()
 	if (flag) {
 		flag = FALSE;
 		InitializeListHead(&_MsgHead.Links);
+		InitializeListHead(&_WaitingMsgHead.Links);
 	}
 }
 
 NTSTATUS
-addMsgListEntry(
+initMsgListEntry(
 	PMY_MSG_LIST_ENTRY ListEntry,
 	PUNICODE_STRING Filename
 	)
@@ -32,10 +36,15 @@ addMsgListEntry(
 	NTSTATUS status = STATUS_SUCCESS;
 	KIRQL oldIrql;
 
+	ListEntry = ExAllocatePoolWithTag(
+		NonPagedPool, sizeof(MY_MSG_LIST_ENTRY), ALLOC_TAG);
 	if (ListEntry == NULL) {
-		return STATUS_INVALID_PARAMETER;
+		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
+	InitializeListHead(&ListEntry->Links);
+
+	// 当前进程 ID
 	ListEntry->Pid = GET_PID_FROM_EPROCESS(PsGetCurrentProcess());
 
 	RtlInitUnicodeString(&ListEntry->Filename, Filename->Buffer);
@@ -44,21 +53,63 @@ addMsgListEntry(
 	KeInitializeEvent(&ListEntry->Event, SynchronizationEvent, TRUE);
 
 	KeAcquireSpinLock(&_SpinLock, &oldIrql);
-	initMsgHead();
-	AppendTailList(&_MsgHead.Links, &ListEntry->Links);
+	if (!Forbidden) {
+		initMsgHead();
+		AppendTailList(&_MsgHead.Links, &ListEntry->Links);
+	}
+	else {
+		ExFreePool(ListEntry);
+		ListEntry = NULL;
+		status = STATUS_ABANDONED;
+	}
 	KeReleaseSpinLock(&_SpinLock, oldIrql);
 
 	return status;
 }
 
-PMY_MSG_LIST_ENTRY
-getMsgListFirst()
+NTSTATUS
+freeMsgListEntry(
+	PMY_MSG_LIST_ENTRY ListEntry
+	)
 {
-	if (IsListEmpty(&_MsgHead.Links)) {
-		return NULL;
+	KIRQL oldIrql;
+
+	// 移出队列，并释放内存
+
+	KeAcquireSpinLock(&_WSpinLock, &oldIrql);
+	initMsgHead();
+	RemoveEntryList(&ListEntry->Links);			// FIXME: 可能发生 FatalError
+	KeReleaseSpinLock(&_WSpinLock, oldIrql);
+
+	ExFreePool(ListEntry);
+
+	return STATUS_SUCCESS;
+}
+
+NTSTATUS
+freeAllMsgs(
+	)
+	// 释放所有消息，在 DriverUnload 中调用
+{
+	PMY_MSG_LIST_ENTRY ptr;
+	PMY_MSG_LIST_ENTRY temp;
+
+	Forbidden = TRUE;
+
+	while (!isMsgListEmpty()) {
+		queryMsgListFirst();
 	}
 
-	return (PMY_MSG_LIST_ENTRY)(_MsgHead.Links.Flink);
+	// 激活所有等待用户反馈的事件
+	ptr = (PMY_MSG_LIST_ENTRY)_WaitingMsgHead.Links.Flink;
+	while (ptr != &_WaitingMsgHead) {
+		temp = (PMY_MSG_LIST_ENTRY)ptr->Links.Flink;
+		ptr->Status = MSG_STATUS_ABANDONED;
+		KeSetEvent(&ptr->Event, 0, FALSE);
+		ptr = temp;
+	}
+
+	return STATUS_SUCCESS;
 }
 
 PMY_MSG_LIST_ENTRY
@@ -85,17 +136,18 @@ getNewMsgEvent()
 BOOLEAN
 isMsgListEmpty()
 {
+	initMsgHead();
 	return IsListEmpty(&_MsgHead.Links);
 }
 
-VOID
-removeMsgListFirst()
+PMY_MSG_LIST_ENTRY
+queryMsgListFirst()
 {
 	KIRQL oldIrql;
 	PLIST_ENTRY entry;
 
 	if (IsListEmpty(&_MsgHead.Links)) {
-		return;
+		return NULL;
 	}
 
 	KeAcquireSpinLock(&_SpinLock, &oldIrql);
@@ -103,7 +155,14 @@ removeMsgListFirst()
 	entry = RemoveHeadList(&_MsgHead.Links);
 	KeReleaseSpinLock(&_SpinLock, oldIrql);
 
-	// 不释放内存， 内存由 MyCreateSection()　释放
+	InitializeListHead(entry);
+
+	// 移至等待用户反馈队列
+	KeAcquireSpinLock(&_WSpinLock, &oldIrql);
+	AppendTailList(&_WaitingMsgHead.Links, entry);
+	KeReleaseSpinLock(&_WSpinLock, oldIrql);
+
+	return (PMY_MSG_LIST_ENTRY)entry;
 }
 
 VOID

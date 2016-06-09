@@ -146,6 +146,7 @@
     <ClInclude Include="message.h" />
     <ClInclude Include="mydef.h" />
     <ClInclude Include="my_ssdt.h" />
+    <ClInclude Include="offsets.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="driver.c" />

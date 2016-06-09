@@ -9,4 +9,4 @@
 
 typedef UCHAR BYTE, *PBYTE;
 typedef WCHAR WORD, *PWORD;
-typedef UINT32 DWORD, *PDWORD;
+typedef ULONG DWORD, *PDWORD;

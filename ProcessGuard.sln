@@ -7,7 +7,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ProcList", "ProcList\ProcLi
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ProcGuardDriver", "ProcGuardDriver\ProcGuardDriver.vcxproj", "{2177E7CD-6EDB-4EF9-ACAD-3E2EE457C4DD}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ProcessListDriver", "ProcessListDriver\DKOMProcesses.vcxproj", "{6E0579DB-3FD3-4B7E-AFAD-C0876DFFA4B9}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ProcListDriver", "ProcListDriver\DKOMProcesses.vcxproj", "{6E0579DB-3FD3-4B7E-AFAD-C0876DFFA4B9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

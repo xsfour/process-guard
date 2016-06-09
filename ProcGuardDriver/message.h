@@ -2,7 +2,7 @@
 
 #include "mydef.h"
 
-#include <wdm.h>
+#include <ntifs.h>
 
 #define MSG_STATUS_PENDING 0
 #define MSG_STATUS_ABANDONED 1
@@ -10,6 +10,9 @@
 
 #define MSG_CONFIRMED(_MsgListEntry) \
 	((_MsgListEntry)->Status == MSG_STATUS_CONFIRMED)
+
+#define MSG_PENDING(_MsgListEntry) \
+	((_MsgListEntry)->Status == MSG_STATUS_PENDING)
 
 #pragma pack(1)
 typedef struct _MY_MSG_LIST_ENTRY {
@@ -22,13 +25,18 @@ typedef struct _MY_MSG_LIST_ENTRY {
 #pragma pack()
 
 NTSTATUS
-addMsgListEntry(
+initMsgListEntry(
 	PMY_MSG_LIST_ENTRY ListEntry,
 	PUNICODE_STRING Filename
 	);
 
-PMY_MSG_LIST_ENTRY
-getMsgListFirst();
+NTSTATUS
+freeMsgListEntry(
+	PMY_MSG_LIST_ENTRY ListEntry
+	);
+
+NTSTATUS
+freeAllMsgs();
 
 PMY_MSG_LIST_ENTRY
 findMsgByEvent(
@@ -41,8 +49,8 @@ getNewMsgEvent();
 BOOLEAN
 isMsgListEmpty();
 
-VOID
-removeMsgListFirst();
+PMY_MSG_LIST_ENTRY
+queryMsgListFirst();
 
 VOID
 setProcessIdOffset(

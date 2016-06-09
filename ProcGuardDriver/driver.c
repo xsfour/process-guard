@@ -1,6 +1,7 @@
 #include "driver.h"
 
 #include "message.h"
+#include "my_ssdt.h"
 
 #define DRIVER_NAME L"ProcGuard"
 #define SYMB_LINK_NAME L"\\DOSDevices\\" DRIVER_NAME L"CDOSL"
@@ -93,7 +94,7 @@ DriverEntry(
 	DriverObject->MajorFunction[IRP_MJ_CLOSE] = MyCloseDispatch;
 	DriverObject->MajorFunction[IRP_MJ_READ] = MyReadDispatch;
 
-	setProcessIdOffset(getProcessIdOffset());
+	//setProcessIdOffset(getProcessIdOffset());
 
 	return status;
 }
@@ -141,6 +142,9 @@ MyCreateDispatch(
 	_DeviceCreated = TRUE;
 	KeReleaseSpinLock(&_SpinLock, oldIrql);
 	
+	// 当设备创建时进行挂钩
+	hook();
+
 	Irp->IoStatus.Status = STATUS_SUCCESS;
 
 	goto ret;
@@ -167,6 +171,10 @@ MyCloseDispatch(
 	IoCompleteRequest(Irp, IO_NO_INCREMENT);
 
 	_DeviceCreated = FALSE;  // Safe?
+
+	// 设备关闭时取消挂钩
+	KdPrint((DBG_PREFIX "Unhooking...\r\n"));
+	unhook();
 
 	return Irp->IoStatus.Status;
 }
@@ -206,11 +214,11 @@ MyReadDispatch(
 			0, NULL);
 	}
 
-	msg = getMsgListFirst();  // 理论上不会出现结果为 NULL 的情况？
+	msg = queryMsgListFirst();  // 理论上不会出现结果为 NULL 的情况？
 
 	eventAddr = &msg->Event;
-	buffer = writeBuffer(buffer, &eventAddr, sizeof(eventAddr));
 	buffer = writeBuffer(buffer, &msg->Pid, sizeof(msg->Pid));
+	buffer = writeBuffer(buffer, &eventAddr, sizeof(eventAddr));
 	buffer = writeBuffer(buffer, msg->Filename.Buffer, msg->Filename.Length);
 	information = sizeof(eventAddr) + sizeof(msg->Pid) + msg->Filename.Length;
 
