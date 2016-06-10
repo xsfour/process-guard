@@ -24,15 +24,15 @@ typedef struct _MY_MSG_LIST_ENTRY {
 } MY_MSG_LIST_ENTRY, *PMY_MSG_LIST_ENTRY;
 #pragma pack()
 
-NTSTATUS
-initMsgListEntry(
-	PMY_MSG_LIST_ENTRY ListEntry,
-	PUNICODE_STRING Filename
+PMY_MSG_LIST_ENTRY
+newMsgListEntry(
+	_In_ ULONG Pid,
+	_In_ PUNICODE_STRING Filename
 	);
 
 NTSTATUS
 freeMsgListEntry(
-	PMY_MSG_LIST_ENTRY ListEntry
+	_In_ PMY_MSG_LIST_ENTRY ListEntry
 	);
 
 NTSTATUS
@@ -40,7 +40,7 @@ freeAllMsgs();
 
 PMY_MSG_LIST_ENTRY
 findMsgByEvent(
-	PKEVENT Event
+	_In_ PKEVENT Event
 	);
 
 PKEVENT
@@ -54,5 +54,5 @@ queryMsgListFirst();
 
 VOID
 setProcessIdOffset(
-	ULONG Offset
+	_In_ ULONG Offset
 	);

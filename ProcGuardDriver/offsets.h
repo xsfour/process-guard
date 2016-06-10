@@ -64,3 +64,6 @@
 #define GET_PPID_FROM_EPROCESS(_eprocessPtr) \
 	(*(PULONG)\
 	((PBYTE)(_eprocessPtr) + PPID_TO_EPROCESS))
+
+#define GET_IMAGE_NAME_FROM_EPROCESS(_eprocessPtr) \
+	((PUCHAR)(_eprocessPtr) + EP_OFFSET_IMAGE_NAME)

@@ -22,6 +22,8 @@ public:
 
 	const std::wstring &getLastError() const;
 
+	BOOLEAN hideProcess(const std::string &name);
+
 private:
 	KernelModeQuery() : errorMsg(L"") {}
 

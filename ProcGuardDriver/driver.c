@@ -208,20 +208,27 @@ MyReadDispatch(
 
 	// 如果消息队列是空的，等待新的消息产生
 	while (isMsgListEmpty()) {
+		status = STATUS_UNSUCCESSFUL;
+		information = 0;
+		goto ret;
+/*
 		KeWaitForSingleObject(
 			getNewMsgEvent(),
 			Executive,
 			KernelMode,
 			0, NULL);
+*/
 	}
 
 	msg = queryMsgListFirst();  // 理论上不会出现结果为 NULL 的情况？
 
 	eventAddr = &msg->Event;
 	buffer = writeBuffer(buffer, &msg->Pid, sizeof(msg->Pid));
-	buffer = writeBuffer(buffer, &eventAddr, sizeof(eventAddr));
 	buffer = writeBuffer(buffer, msg->Filename.Buffer, msg->Filename.Length);
-	information = sizeof(eventAddr) + sizeof(msg->Pid) + msg->Filename.Length;
+	buffer = writeBuffer(buffer, L"\0", sizeof(L"\0"));
+	information = sizeof(eventAddr) + sizeof(msg->Pid) + msg->Filename.Length + sizeof(L"\0");
+
+	freeMsgListEntry(msg);
 
 ret:
 	Irp->IoStatus.Status = status;
@@ -243,9 +250,11 @@ MyWriteDispatch(
 	PVOID buffer;
 	ULONG bufferLen;
 
-	PKEVENT pEvent;
-	USHORT response;
-	PMY_MSG_LIST_ENTRY msg;
+//	PKEVENT pEvent;
+//	USHORT response;
+//	PMY_MSG_LIST_ENTRY msg;
+
+	CHAR targetName[15];
 
 	UNREFERENCED_PARAMETER(DeviceObject);
 
@@ -259,16 +268,23 @@ MyWriteDispatch(
 		goto ret;
 	}
 
+	buffer = readBuffer(buffer, targetName, strnlen_s(buffer, bufferLen));
+	information = bufferLen;
+
+	targetName[min(bufferLen, 14)] = '\0';
+
+	setTargetName(targetName);
+
 	// 读取内容
-	buffer = readBuffer(buffer, &pEvent, sizeof(pEvent));
-	buffer = readBuffer(buffer, &response, sizeof(response));
-	information = sizeof(pEvent) + sizeof(response);
+	//buffer = readBuffer(buffer, &pEvent, sizeof(pEvent));
+	//buffer = readBuffer(buffer, &response, sizeof(response));
+	//information = sizeof(pEvent) + sizeof(response);
 
 	// 根据用户的反馈处理相应消息
-	msg = findMsgByEvent(pEvent);
-	msg->Status =(response == MSG_STATUS_CONFIRMED) ?
-		MSG_STATUS_CONFIRMED : MSG_STATUS_ABANDONED;
-	KeSetEvent(&msg->Event, 0, FALSE);
+	//msg = findMsgByEvent(pEvent);
+	//msg->Status =(response == MSG_STATUS_CONFIRMED) ?
+		//MSG_STATUS_CONFIRMED : MSG_STATUS_ABANDONED;
+	//KeSetEvent(&msg->Event, 0, FALSE);
 
 ret:
 	Irp->IoStatus.Status = status;

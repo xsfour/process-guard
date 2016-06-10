@@ -19,6 +19,8 @@
 // HANDLE_TABLE
 #define HT_OFFSET_LIST (0x010)
 
+#define HT_OFFSET_PID (0x008)
+
 #else
 
 #define EP_OFFSET_PID (0x0b4)
@@ -47,6 +49,8 @@
 
 #define AC_LINKS_TO_EPROCESS (EP_OFFSET_AC_LINKS)
 
+#define PID_TO_OB_LIST_ENTRY (HT_OFFSET_PID - HT_OFFSET_LIST)
+
 
 #define GET_LIST_ENTRY_FROM_EPROCESS(_eprocessPtr) \
 	((PLIST_ENTRY)\
@@ -67,3 +71,22 @@
 #define GET_PPID_FROM_EPROCESS(_eprocessPtr) \
 	(*(PULONG)\
 	((PBYTE)(_eprocessPtr) + PPID_TO_EPROCESS))
+
+#define GET_IMAGE_NAME_FROM_EPROCESS(_eprocessPtr) \
+	((PUCHAR)(_eprocessPtr) + PPID_TO_EPROCESS)
+
+#define GET_OB_TABLE_FROM_EPROCESS(_eprocessPtr) \
+	(*(PVOID*)\
+	((PBYTE)(_eprocessPtr) + EP_OFFSET_OB_TABLE))
+
+#define GET_LIST_ENTRY_FROM_OB_TABLE(_handleTable) \
+	((PLIST_ENTRY)\
+	((PBYTE)(_handleTable) + HT_OFFSET_LIST))
+
+#define GET_PID_FROM_OB_TABLE(_handleTable) \
+	(*(PULONG)\
+	((PBYTE)(_handleTable) + HT_OFFSET_PID))
+
+#define GET_PID_FROM_OB_LIST_ENTRY(_listEntry) \
+	(*(PULONG)\
+	((PBYTE)(_listEntry) + PID_TO_OB_LIST_ENTRY))

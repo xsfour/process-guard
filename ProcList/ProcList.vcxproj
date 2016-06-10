@@ -127,6 +127,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -145,6 +146,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -153,6 +155,7 @@
     <ClCompile Include="ProcGuard.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="DriverInstaller.h" />
     <ClInclude Include="KernelModeQuery.h" />
     <ClInclude Include="ProcessInfo.h" />
     <ClInclude Include="ProcGuard.h" />

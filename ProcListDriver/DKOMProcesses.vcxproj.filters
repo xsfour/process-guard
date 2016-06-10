@@ -19,10 +19,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="driver.c">
+    <ClCompile Include="process.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="process.c">
+    <ClCompile Include="listdriver.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

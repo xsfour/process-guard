@@ -11,7 +11,11 @@ public:
 
 	inline static ProcGuard& getInstance();
 
-	BOOLEAN listen();
+	BOOLEAN listen(const std::string& target);
+
+	VOID stop();
+
+	const std::wstring& getLastError();
 
 private:
 	ProcGuard();
@@ -21,6 +25,8 @@ private:
 	std::wstring errorMsg;
 
 	const WCHAR *DEVICE_SYMB_LINK = L"\\\\.\\ProcGuardCDOSL";
+
+	BOOL listening;
 };
 
 

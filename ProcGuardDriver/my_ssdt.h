@@ -26,6 +26,11 @@ hook();
 VOID
 unhook();
 
+VOID
+setTargetName(
+	_In_ PCHAR target
+	);
+
 typedef NTSTATUS(*CREATE_SECTION_FUNC)(
 	_Out_    PHANDLE            SectionHandle,
 	_In_     ACCESS_MASK        DesiredAccess,

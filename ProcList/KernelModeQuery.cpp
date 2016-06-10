@@ -38,16 +38,11 @@ BOOLEAN KernelModeQuery::reloadProcesses()
 
 		size_t idx = info.ImageFileName.find_last_of(L'\\');
 		if (idx == std::wstring::npos) {
-			idx = 0;
+			info.ImageName = info.ImageFileName;
 		}
 		else {
-			++idx;
+			info.ImageName = info.ImageFileName.substr(++idx);
 		}
-		info.ImageName = info.ImageFileName.substr(idx);
-
-		//printf("%2d) %lu  %lu %ws\r\n", i++, info.Pid,
-			//length - 2 * sizeof(ULONG),
-			//(PWCHAR)(buffer + 2 * sizeof(ULONG)));
 
 		processes.push_back(info);
 	}
@@ -67,6 +62,9 @@ KernelModeQuery::mergeProcesses(Processes &newProcesses)
 	Processes::iterator it2 = newProcesses.begin();
 
 	while (it1 != processes.end() && it2 != newProcesses.end()) {
+		if (it1->Pid == 4) {
+			it1->ImageName = L"System";
+		}
 		if (it1->Pid == it2->Pid) {
 			it1->Hidden = FALSE;
 			++it1;
@@ -98,4 +96,39 @@ KernelModeQuery::sort(Processes &processes)
 {
 	std::sort(processes.begin(), processes.end(),
 		ProcessInfo::ProcessInfoCompare);
+}
+
+BOOLEAN
+KernelModeQuery::hideProcess(const std::string &name)
+{
+	HANDLE device = CreateFile(
+		DEVICE_SYMB_LINK,
+		GENERIC_READ | GENERIC_WRITE,
+		0,
+		0,
+		OPEN_EXISTING,
+		FILE_ATTRIBUTE_SYSTEM,
+		0);
+
+	if (device == INVALID_HANDLE_VALUE) {
+		errorMsg = L"Çý¶¯Î´¼ÓÔØ";
+		return FALSE;
+	}
+
+	char buffer[15];
+	ULONG length;
+	size_t size = min(15, name.size() + 1);
+
+	for (size_t i = 0; i < size; ++i) {
+		buffer[i] = name[i];
+	}
+	buffer[size] = '\0';
+
+	BOOL res = WriteFile(
+		device,
+		buffer,
+		size,
+		&length, NULL);
+
+	return res;
 }

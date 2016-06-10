@@ -27,27 +27,37 @@ initMsgHead()
 	}
 }
 
-NTSTATUS
-initMsgListEntry(
-	PMY_MSG_LIST_ENTRY ListEntry,
-	PUNICODE_STRING Filename
+PMY_MSG_LIST_ENTRY
+newMsgListEntry(
+	_In_ ULONG Pid,
+	_In_ PUNICODE_STRING Filename
 	)
 {
-	NTSTATUS status = STATUS_SUCCESS;
 	KIRQL oldIrql;
 
-	ListEntry = ExAllocatePoolWithTag(
+	PMY_MSG_LIST_ENTRY ListEntry = ExAllocatePoolWithTag(
 		NonPagedPool, sizeof(MY_MSG_LIST_ENTRY), ALLOC_TAG);
 	if (ListEntry == NULL) {
-		return STATUS_INSUFFICIENT_RESOURCES;
+		return NULL;
 	}
 
 	InitializeListHead(&ListEntry->Links);
 
-	// 当前进程 ID
-	ListEntry->Pid = GET_PID_FROM_EPROCESS(PsGetCurrentProcess());
+	ListEntry->Pid = Pid;
 
-	RtlInitUnicodeString(&ListEntry->Filename, Filename->Buffer);
+	ListEntry->Filename.Buffer = ExAllocatePoolWithTag(
+		NonPagedPool,
+		Filename->Length,
+		ALLOC_TAG
+		);
+	if (ListEntry->Filename.Buffer == NULL) {
+		ExFreePool(ListEntry);
+		return NULL;
+	}
+
+	ListEntry->Filename.Length = ListEntry->Filename.MaximumLength
+		= Filename->Length;
+	RtlCopyMemory(ListEntry->Filename.Buffer, Filename->Buffer, Filename->Length);
 
 	ListEntry->Status = MSG_STATUS_PENDING;
 	KeInitializeEvent(&ListEntry->Event, SynchronizationEvent, TRUE);
@@ -60,16 +70,15 @@ initMsgListEntry(
 	else {
 		ExFreePool(ListEntry);
 		ListEntry = NULL;
-		status = STATUS_ABANDONED;
 	}
 	KeReleaseSpinLock(&_SpinLock, oldIrql);
 
-	return status;
+	return ListEntry;
 }
 
 NTSTATUS
 freeMsgListEntry(
-	PMY_MSG_LIST_ENTRY ListEntry
+	_In_ PMY_MSG_LIST_ENTRY ListEntry
 	)
 {
 	KIRQL oldIrql;
@@ -81,6 +90,7 @@ freeMsgListEntry(
 	RemoveEntryList(&ListEntry->Links);			// FIXME: 可能发生 FatalError
 	KeReleaseSpinLock(&_WSpinLock, oldIrql);
 
+	ExFreePool(ListEntry->Filename.Buffer);
 	ExFreePool(ListEntry);
 
 	return STATUS_SUCCESS;
@@ -108,6 +118,8 @@ freeAllMsgs(
 		KeSetEvent(&ptr->Event, 0, FALSE);
 		ptr = temp;
 	}
+
+	Forbidden = FALSE;
 
 	return STATUS_SUCCESS;
 }

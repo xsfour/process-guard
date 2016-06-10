@@ -30,6 +30,9 @@
     <ClInclude Include="ProcGuard.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="DriverInstaller.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
