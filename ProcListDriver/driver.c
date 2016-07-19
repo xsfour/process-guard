@@ -46,7 +46,7 @@ DriverEntry(
 
 	UNREFERENCED_PARAMETER(RegistryPath);
 
-	// ´´½¨Éè±¸
+	// åˆ›å»ºè®¾å¤‡
 	status = IoCreateDevice(
 		DriverObject,
 		sizeof(MY_DEVICE_EXT),
@@ -77,10 +77,10 @@ DriverEntry(
 	device->Flags &= ~DO_DEVICE_INITIALIZING;
 	device->Flags |= DO_DIRECT_IO;
 
-	// Ğ¶ÔØº¯Êı
+	// å¸è½½å‡½æ•°
 	DriverObject->DriverUnload = DriverUnload;
 	
-	// ·Ö·¢º¯Êı
+	// åˆ†å‘å‡½æ•°
 	for (i = 0; i < IRP_MJ_MAXIMUM_FUNCTION; ++i) {
 		DriverObject->MajorFunction[i] = MyNullDispatch;
 	}
@@ -284,13 +284,13 @@ readBuffer(
 VOID
 init()
 //
-// Ö»ÄÜ±» DriverEntry µ÷ÓÃ
-// Í¨¹ı System ½ø³ÌµÄ EPROCESS ÕÒµ½ ActiveProcessHead
+// åªèƒ½è¢« DriverEntry è°ƒç”¨
+// é€šè¿‡ System è¿›ç¨‹çš„ EPROCESS æ‰¾åˆ° ActiveProcessHead
 //
 {
 	PEPROCESS curproc;
 	curproc = PsGetCurrentProcess();
 
-	// System ½ø³ÌÇ°ÏòÖ¸ÕëËùÖ¸¼´»î¶¯½ø³Ì¶ÓÁĞÍ·
+	// System è¿›ç¨‹å‰å‘æŒ‡é’ˆæ‰€æŒ‡å³æ´»åŠ¨è¿›ç¨‹é˜Ÿåˆ—å¤´
 	setActiveProcessHead(GET_LIST_ENTRY_FROM_EPROCESS(curproc)->Blink);
 }
